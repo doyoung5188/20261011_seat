@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리반 자리배치</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: 칠판 → 3분단 짝 책상 격자 → 아래에 도구와 명단. 교실 그대로의 평면도. */
+:root{
+  --bg:#f3f1ea; --paper:#fffdf7; --fg:#26302a; --muted:#6b7268; --line:#ddd8c9;
+  --board:#2e4a3c; --board-fg:#e9f1e4; --desk:#e6d3b3; --desk-edge:#c9b08a;
+  --boy:#2f6fb3; --boy-soft:#dce9f7; --girl:#c2456b; --girl-soft:#f8dfe7;
+  --empty:#ebe7dc; --accent:#e0a526; --ok:#2f8a4f; --warn:#c0562b;
+  --f-display:"Jua","Noto Sans KR",system-ui,sans-serif;
+  --f-body:"Noto Sans KR",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#171b18; --paper:#212622; --fg:#e8ece4; --muted:#9aa396; --line:#353c36;
+  --board:#1f3a2d; --board-fg:#d7e6cf; --desk:#4a3f2e; --desk-edge:#6a5a40;
+  --boy:#7fb2ea; --boy-soft:#1d3047; --girl:#ee8fac; --girl-soft:#46222f;
+  --empty:#2a2f2b; --accent:#f0b940; --ok:#6cc48a; --warn:#f08a5d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#171b18; --paper:#212622; --fg:#e8ece4; --muted:#9aa396; --line:#353c36;
+  --board:#1f3a2d; --board-fg:#d7e6cf; --desk:#4a3f2e; --desk-edge:#6a5a40;
+  --boy:#7fb2ea; --boy-soft:#1d3047; --girl:#ee8fac; --girl-soft:#46222f;
+  --empty:#2a2f2b; --accent:#f0b940; --ok:#6cc48a; --warn:#f08a5d; color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+h1{font-family:var(--f-display);font-weight:400;font-size:1.9rem;margin:0;line-height:1.1}
+.sub{color:var(--muted);font-size:.9rem;margin:2px 0 0}
+.tabs{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px}
+.tabs button{border:0;background:none;color:var(--muted);font:inherit;font-weight:700;padding:7px 16px;border-radius:999px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--board);color:var(--board-fg)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.room{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 12px 18px;display:flex;flex-direction:column;gap:16px}
+.board{background:var(--board);color:var(--board-fg);border-radius:6px;text-align:center;padding:10px;font-family:var(--f-display);font-size:1.15rem;letter-spacing:.3em;box-shadow:inset 0 -5px 0 rgba(0,0,0,.18);position:relative}
+.board small{display:block;font-family:var(--f-body);font-size:.72rem;letter-spacing:.05em;opacity:.75}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(10px,4vw,34px)}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.col h3{margin:0;text-align:center;font-family:var(--f-display);font-weight:400;font-size:1rem;color:var(--muted)}
+.desk{display:grid;grid-template-columns:1fr 1fr;gap:3px;background:var(--desk);border-bottom:4px solid var(--desk-edge);border-radius:8px;padding:4px}
+.seat{appearance:none;border:2px solid transparent;border-radius:6px;min-height:clamp(54px,12vw,74px);padding:4px 2px;font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;min-width:0;transition:transform .12s ease}
+.seat .n{font-family:var(--f-display);font-size:clamp(1.15rem,4.6vw,1.65rem);line-height:1;font-variant-numeric:tabular-nums}
+.seat .nm{font-size:clamp(.62rem,2.6vw,.78rem);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:2px}
+.seat .tag{font-size:.68rem;font-weight:700;opacity:.8}
+.seat.M{background:var(--boy-soft);color:var(--boy)}
+.seat.F{background:var(--girl-soft);color:var(--girl)}
+.seat.X{background:var(--empty);color:var(--muted);border:2px dashed var(--line)}
+.seat:hover{transform:translateY(-1px)}
+.seat.sel{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.seat.pop{animation:pop .35s ease}
+@keyframes pop{0%{transform:scale(.85)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
+.room.flip .board{order:2}
+
+.status{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.85rem;font-weight:500;background:var(--paper);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.chip .dot{width:9px;height:9px;border-radius:50%}
+.chip.ok{color:var(--ok)} .chip.bad{color:var(--warn);border-color:var(--warn)}
+.hint{color:var(--muted);font-size:.88rem;margin:0}
+
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--paper);color:var(--fg);font:inherit;font-weight:500;padding:9px 14px;border-radius:10px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#2a1d00;font-family:var(--f-display);font-size:1.15rem;padding:10px 22px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.stepper{display:inline-flex;align-items:center;gap:6px;font-size:.9rem}
+.stepper button{width:32px;height:32px;padding:0}
+.spacer{flex:1}
+
+details{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:4px 14px}
+summary{cursor:pointer;font-weight:700;padding:10px 0}
+.roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;padding-block:6px 14px}
+.roster h4{margin:0 0 6px;font-family:var(--f-display);font-weight:400;font-size:1.05rem}
+.roster h4.b{color:var(--boy)} .roster h4.g{color:var(--girl)}
+.rrow{display:grid;grid-template-columns:2.2em 1fr auto;gap:8px;align-items:center;padding:3px 0}
+.rrow .num{font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
+.rrow input[type=text]{width:100%;min-width:0;font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg)}
+.rrow label{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.rrow.off .num,.rrow.off input[type=text]{opacity:.4;text-decoration:line-through}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:10px;font-size:.9rem;max-width:calc(100% - 32px)}
+.print-head{display:none}
+@media print{
+  @page{size:A4 landscape;margin:12mm}
+  :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{
+    --bg:#fff;--paper:#fff;--fg:#000;--muted:#444;--line:#999;
+    --board:#fff;--board-fg:#000;--desk:#fff;--desk-edge:#000;
+    --boy:#000;--boy-soft:#fff;--girl:#000;--girl-soft:#fff;--empty:#fff;color-scheme:light}
+  body{font-size:12pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .wrap{max-width:none;padding:0;gap:8mm}
+  header,.status,.hint,.tools,details,.toast{display:none!important}
+  .print-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:3mm}
+  .print-head h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:22pt}
+  .print-head span{font-size:11pt}
+  .room{border:0;padding:0;gap:8mm}
+  .board{border:2px solid #000;box-shadow:none;font-size:16pt}
+  .grid{gap:12mm}
+  .col{gap:5mm;break-inside:avoid}
+  .col h3{color:#000;font-size:13pt}
+  .desk{border:2px solid #000;border-radius:4px;padding:0;gap:0}
+  .seat{min-height:22mm;border:0;border-radius:0;transform:none!important;box-shadow:none!important}
+  .seat+.seat{border-left:1px solid #000}
+  .seat.X{border:0;background:repeating-linear-gradient(45deg,#fff 0 6px,#eee 6px 8px)}
+  .seat+.seat.X{border-left:1px solid #000}
+  .seat .n{font-size:20pt}
+  .seat .nm{font-size:11pt}
+  .seat .tag{font-size:10pt}
+}
+@media (prefers-reduced-motion: reduce){.seat,.seat.pop{animation:none;transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>우리반 자리배치</h1>
+      <p class="sub">남학생 1~14번 · 여학생 21~34번 · 3분단 짝 자리</p>
+    </div>
+    <div class="tabs" role="group" aria-label="모드">
+      <button id="tab-edit" type="button">자리 설정</button>
+      <button id="tab-arr" type="button">자리 바꾸기</button>
+    </div>
+  </header>
+
+  <div class="status" id="status"></div>
+  <p class="hint" id="hint"></p>
+
+  <div class="print-head"><h2>우리반 자리배치</h2><span id="print-date"></span></div>
+
+  <section class="room" id="room">
+    <div class="board" id="board">칠 판<small>교탁</small></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <div class="tools" id="tools-edit">
+    <span class="stepper">줄 수
+      <button class="btn" id="rows-minus" type="button" aria-label="줄 줄이기">−</button>
+      <b id="rows-val" style="min-width:1.2em;text-align:center"></b>
+      <button class="btn" id="rows-plus" type="button" aria-label="줄 늘리기">+</button>
+    </span>
+    <button class="btn" id="all-mf" type="button">모두 남·여 짝으로</button>
+    <button class="btn" id="reset" type="button">처음 자리로</button>
+  </div>
+
+  <div class="tools" id="tools-arr">
+    <button class="btn primary" id="shuffle" type="button">🎲 랜덤으로 돌리기</button>
+    <span class="spacer"></span>
+    <button class="btn" id="flip" type="button">교사 시점으로 보기</button>
+    <button class="btn" id="print" type="button">🖨 인쇄</button>
+    <button class="btn" id="copy" type="button">결과 복사</button>
+    <button class="btn" id="clear" type="button">배치 지우기</button>
+  </div>
+
+  <details id="roster-box">
+    <summary>학생 명단 (이름 입력 · 결번 설정)</summary>
+    <div class="roster" id="roster"></div>
+  </details>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const COLS = 3;
+const BOY_NUMS = Array.from({length:14},(_,i)=>i+1);
+const GIRL_NUMS = Array.from({length:14},(_,i)=>i+21);
+const KEY = 'class-seat-app-v1';
+
+function defaultLayout(rows){
+  const L = [];
+  for(let r=0;r<rows;r++){ const row=[]; for(let c=0;c<COLS;c++) row.push(['M','F']); L.push(row); }
+  return L;
+}
+function defaultState(){
+  const layout = defaultLayout(5);
+  layout[4][1] = ['M','X'];
+  layout[4][2] = ['X','X'];
+  const roster = {};
+  BOY_NUMS.forEach(n=>roster[n]={name:'',on:true});
+  GIRL_NUMS.forEach(n=>roster[n]={name:'',on:n!==34});
+  return {layout, assign:{}, roster, flipped:false, mode:'arr'};
+}
+function load(){ try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.layout&&s.roster) return s; }catch(e){} return null; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+let S = load() || defaultState();
+let selected = null;
+
+const $ = id => document.getElementById(id);
+const key = (r,c,s)=>`${r}-${c}-${s}`;
+const isBoy = n => n>=1 && n<=14;
+const activeBoys = ()=>BOY_NUMS.filter(n=>S.roster[n].on);
+const activeGirls = ()=>GIRL_NUMS.filter(n=>S.roster[n].on);
+function countSeats(t){ let k=0; S.layout.forEach(row=>row.forEach(d=>d.forEach(x=>{ if(x===t) k++; }))); return k; }
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>t.hidden=true,2200); }
+
+function renderStatus(){
+  const b=activeBoys().length, g=activeGirls().length, ms=countSeats('M'), fs=countSeats('F');
+  const okB=b===ms, okG=g===fs;
+  $('status').innerHTML =
+    `<span class="chip ${okB?'ok':'bad'}"><span class="dot" style="background:var(--boy)"></span>남학생 ${b}명 · 남자 자리 ${ms}개${okB?' ✓':''}</span>`+
+    `<span class="chip ${okG?'ok':'bad'}"><span class="dot" style="background:var(--girl)"></span>여학생 ${g}명 · 여자 자리 ${fs}개${okG?' ✓':''}</span>`+
+    `<span class="chip">빈자리 ${countSeats('X')}개</span>`;
+  const ready = okB && okG;
+  $('shuffle').disabled = !ready;
+  let msg;
+  if(S.mode==='edit') msg='자리를 누르면 남 → 여 → 빈자리 순서로 바뀌어요.';
+  else if(!ready){
+    const parts=[];
+    if(!okB) parts.push(`남자 자리가 ${Math.abs(b-ms)}개 ${b>ms?'부족해요':'많아요'}`);
+    if(!okG) parts.push(`여자 자리가 ${Math.abs(g-fs)}개 ${g>fs?'부족해요':'많아요'}`);
+    msg = parts.join(', ')+'. ‘자리 설정’에서 맞춰 주세요.';
+  } else msg='랜덤으로 돌린 뒤, 두 자리를 차례로 누르면 서로 바꿀 수 있어요.';
+  $('hint').textContent=msg;
+}
+
+function seatHTML(r,c,s,t,flash){
+  const k=key(r,c,s), n=S.assign[k];
+  const cls=['seat',t]; if(selected===k) cls.push('sel'); if(flash) cls.push('pop');
+  let inner, label;
+  if(t==='X'){ inner='<span class="tag">빈자리</span>'; label='빈자리'; }
+  else if(n!=null){ const nm=S.roster[n]?.name||''; inner=`<span class="n">${n}</span><span class="nm">${esc(nm)||'&nbsp;'}</span>`; label=`${n}번 ${nm}`; }
+  else { inner=`<span class="tag">${t==='M'?'남':'여'}</span>`; label=t==='M'?'남자 자리':'여자 자리'; }
+  return `<button type="button" class="${cls.join(' ')}" data-k="${k}" aria-label="${c+1}분단 ${r+1}줄 ${label}">${inner}</button>`;
+}
+function esc(s){ return s.replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+
+function renderGrid(flash, override){
+  const rows=S.layout.length;
+  let rOrder=[...Array(rows).keys()], cOrder=[0,1,2], sOrder=[0,1];
+  if(S.flipped){ rOrder.reverse(); cOrder.reverse(); sOrder.reverse(); }
+  let html='';
+  for(const c of cOrder){
+    html+=`<div class="col"><h3>${c+1}분단</h3>`;
+    for(const r of rOrder){
+      html+='<div class="desk">';
+      for(const s of sOrder){
+        if(override){ const t=S.layout[r][c][s]; const k=key(r,c,s);
+          html+= t==='X' ? seatHTML(r,c,s,t) : `<button type="button" class="seat ${t}" tabindex="-1"><span class="n">${override(t)}</span><span class="nm">&nbsp;</span></button>`; }
+        else html+=seatHTML(r,c,s,S.layout[r][c][s],flash);
+      }
+      html+='</div>';
+    }
+    html+='</div>';
+  }
+  $('grid').innerHTML=html;
+  $('room').classList.toggle('flip',S.flipped);
+  $('flip').textContent=S.flipped?'학생 시점으로 보기':'교사 시점으로 보기';
+}
+
+function render(flash){
+  $('tab-edit').setAttribute('aria-pressed',S.mode==='edit');
+  $('tab-arr').setAttribute('aria-pressed',S.mode==='arr');
+  $('tools-edit').hidden=S.mode!=='edit';
+  $('tools-arr').hidden=S.mode!=='arr';
+  $('rows-val').textContent=S.layout.length;
+  renderStatus(); renderGrid(flash);
+}
+
+function renderRoster(){
+  const block=(title,cls,nums)=>`<div><h4 class="${cls}">${title}</h4>`+nums.map(n=>{
+    const p=S.roster[n];
+    return `<div class="rrow ${p.on?'':'off'}"><span class="num">${n}</span>
+      <input type="text" id="nm-${n}" data-n="${n}" value="${esc(p.name)}" placeholder="이름" aria-label="${n}번 이름">
+      <label><input type="checkbox" id="on-${n}" data-n="${n}" ${p.on?'':'checked'}> 결번</label></div>`;
+  }).join('')+'</div>';
+  $('roster').innerHTML=block('남학생','b',BOY_NUMS)+block('여학생','g',GIRL_NUMS);
+}
+
+// 좌석 클릭
+$('grid').addEventListener('click',e=>{
+  const b=e.target.closest('.seat[data-k]'); if(!b) return;
+  const k=b.dataset.k; const [r,c,s]=k.split('-').map(Number);
+  if(S.mode==='edit'){
+    const next={M:'F',F:'X',X:'M'}[S.layout[r][c][s]];
+    S.layout[r][c][s]=next; delete S.assign[k];
+    save(); render(); focusSeat(k); return;
+  }
+  if(selected===null){ selected=k; renderGrid(); focusSeat(k); return; }
+  if(selected===k){ selected=null; renderGrid(); focusSeat(k); return; }
+  const [r1,c1,s1]=selected.split('-').map(Number);
+  const t1=S.layout[r1][c1][s1], t2=S.layout[r][c][s];
+  S.layout[r1][c1][s1]=t2; S.layout[r][c][s]=t1;
+  const a1=S.assign[selected], a2=S.assign[k];
+  if(a2!=null) S.assign[selected]=a2; else delete S.assign[selected];
+  if(a1!=null) S.assign[k]=a1; else delete S.assign[k];
+  selected=null; save(); render(); focusSeat(k); toast('두 자리를 바꿨어요');
+});
+function focusSeat(k){ const el=document.querySelector(`.seat[data-k="${k}"]`); if(el) el.focus(); }
+
+function shuffle(a){ a=[...a]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+let rolling=false;
+$('shuffle').addEventListener('click',()=>{
+  if(rolling) return;
+  const boys=shuffle(activeBoys()), girls=shuffle(activeGirls());
+  const assign={}; let bi=0, gi=0;
+  S.layout.forEach((row,r)=>row.forEach((d,c)=>d.forEach((t,s)=>{
+    if(t==='M') assign[key(r,c,s)]=boys[bi++];
+    else if(t==='F') assign[key(r,c,s)]=girls[gi++];
+  })));
+  selected=null;
+  const finish=()=>{ S.assign=assign; save(); rolling=false; $('shuffle').disabled=false; render(true); toast('새 자리가 정해졌어요!'); };
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){ finish(); return; }
+  rolling=true; $('shuffle').disabled=true;
+  const B=activeBoys(), G=activeGirls(); let ticks=0;
+  const iv=setInterval(()=>{
+    renderGrid(false, t=> t==='M' ? B[Math.floor(Math.random()*B.length)] : G[Math.floor(Math.random()*G.length)]);
+    if(++ticks>=14){ clearInterval(iv); finish(); }
+  },65);
+});
+
+$('tab-edit').onclick=()=>{ S.mode='edit'; selected=null; save(); render(); };
+$('tab-arr').onclick=()=>{ S.mode='arr'; selected=null; save(); render(); };
+$('flip').onclick=()=>{ S.flipped=!S.flipped; save(); render(); };
+$('clear').onclick=()=>{ S.assign={}; selected=null; save(); render(); toast('배치를 지웠어요'); };
+$('rows-plus').onclick=()=>{ if(S.layout.length>=8) return; S.layout.push([['X','X'],['X','X'],['X','X']]); save(); render(); };
+$('rows-minus').onclick=()=>{ if(S.layout.length<=2) return; const r=S.layout.length-1; S.layout.pop();
+  Object.keys(S.assign).forEach(k=>{ if(+k.split('-')[0]===r) delete S.assign[k]; }); save(); render(); };
+$('all-mf').onclick=()=>{ S.layout=defaultLayout(S.layout.length); S.assign={}; save(); render(); toast('모든 책상을 남·여 짝으로 바꿨어요'); };
+$('reset').onclick=()=>{ const d=defaultState(); S.layout=d.layout; S.assign={}; save(); render(); toast('처음 자리 모양으로 되돌렸어요'); };
+
+$('roster').addEventListener('input',e=>{
+  const n=+e.target.dataset.n; if(!n) return;
+  if(e.target.type==='text'){ S.roster[n].name=e.target.value.trim(); save(); renderGrid(); }
+});
+$('roster').addEventListener('change',e=>{
+  const n=+e.target.dataset.n; if(!n||e.target.type!=='checkbox') return;
+  S.roster[n].on=!e.target.checked;
+  if(!S.roster[n].on) Object.keys(S.assign).forEach(k=>{ if(S.assign[k]===n) delete S.assign[k]; });
+  e.target.closest('.rrow').classList.toggle('off',!S.roster[n].on);
+  save(); render();
+});
+
+$('copy').onclick=async()=>{
+  if(!Object.keys(S.assign).length){ toast('먼저 랜덤으로 돌려 주세요'); return; }
+  const lines=['[우리반 자리배치] (칠판 쪽부터)'];
+  S.layout.forEach((row,r)=>{
+    const parts=row.map((d,c)=>`${c+1}분단 `+d.map((t,s)=>{ const n=S.assign[key(r,c,s)]; if(t==='X'||n==null) return '—'; const nm=S.roster[n].name; return nm?`${n} ${nm}`:`${n}`; }).join(' · '));
+    lines.push(`${r+1}줄 | `+parts.join(' | '));
+  });
+  const text=lines.join('\n');
+  try{ await navigator.clipboard.writeText(text); toast('결과를 복사했어요'); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); toast('결과를 복사했어요');}catch(_){toast('복사하지 못했어요');} ta.remove(); }
+};
+
+$('print').onclick=()=>{
+  selected=null; renderGrid();
+  const d=new Date();
+  $('print-date').textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 · ${S.flipped?'교사 시점':'학생 시점'}`;
+  window.print();
+};
+
+renderRoster(); render();
+</script>
+</body>
+</html>
